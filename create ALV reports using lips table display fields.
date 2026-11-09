@@ -1,0 +1,94 @@
+
+REPORT zlips_alv_report.
+
+TYPE-POOLS: slis.
+
+TABLES: lips.
+
+SELECT-OPTIONS:
+  s_vbeln FOR lips-vbeln,
+  s_matnr FOR lips-matnr,
+  s_werks FOR lips-werks.
+
+DATA: gt_lips TYPE STANDARD TABLE OF lips,
+      gs_lips TYPE lips,
+      gt_fcat TYPE slis_t_fieldcat_alv,
+      gs_fcat TYPE slis_fieldcat_alv.
+
+START-OF-SELECTION.
+
+  SELECT *
+    FROM lips
+    INTO TABLE gt_lips
+    UP TO 500 ROWS
+    WHERE vbeln IN s_vbeln
+      AND matnr IN s_matnr
+      AND werks IN s_werks.
+
+  IF gt_lips IS INITIAL.
+    MESSAGE 'No delivery items found' TYPE 'I'.
+    RETURN.
+  ENDIF.
+
+  PERFORM build_fieldcat.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_grid_title       = 'Delivery Item Details'
+      it_fieldcat        = gt_fcat
+      i_save             = 'A'
+    TABLES
+      t_outtab           = gt_lips
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error displaying ALV report' TYPE 'I'.
+  ENDIF.
+
+FORM build_fieldcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'VBELN'.
+  gs_fcat-seltext_m = 'Delivery'.
+  gs_fcat-key = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'POSNR'.
+  gs_fcat-seltext_m = 'Item'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MATNR'.
+  gs_fcat-seltext_m = 'Material'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'WERKS'.
+  gs_fcat-seltext_m = 'Plant'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'LGORT'.
+  gs_fcat-seltext_m = 'Storage Location'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'LFIMG'.
+  gs_fcat-seltext_m = 'Delivery Qty'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'VRKME'.
+  gs_fcat-seltext_m = 'Sales Unit'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'CHARG'.
+  gs_fcat-seltext_m = 'Batch'.
+  APPEND gs_fcat TO gt_fcat.
+
+ENDFORM.
