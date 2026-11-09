@@ -1,0 +1,101 @@
+
+REPORT zvendor_inv_report.
+
+TABLES zvendor_inv.
+
+TYPE-POOLS: slis.
+
+DATA: gt_invoice TYPE STANDARD TABLE OF zvendor_inv,
+      gs_invoice TYPE zvendor_inv,
+      gt_fieldcat TYPE slis_t_fieldcat_alv,
+      gs_layout TYPE slis_layout_alv,
+      gv_form_fm TYPE rs38l_fnam.
+
+PARAMETERS: p_invno TYPE zvendor_inv-inv_no,
+            p_print AS CHECKBOX DEFAULT ' '.
+
+START-OF-SELECTION.
+
+  IF p_print = 'X'.
+
+    IF p_invno IS INITIAL.
+      MESSAGE 'Enter an invoice number to print' TYPE 'E'.
+    ENDIF.
+
+    SELECT SINGLE *
+      FROM zvendor_inv
+      INTO gs_invoice
+      WHERE inv_no = p_invno.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'Invoice not found' TYPE 'E'.
+    ENDIF.
+
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname = 'ZSF_VENDOR_INVOICE'
+      IMPORTING
+        fm_name  = gv_form_fm
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'Activate Smart Form first' TYPE 'E'.
+    ENDIF.
+
+    CALL FUNCTION gv_form_fm
+      EXPORTING
+        is_invoice = gs_invoice
+      EXCEPTIONS
+        formatting_error = 1
+        internal_error   = 2
+        send_error       = 3
+        user_canceled    = 4
+        OTHERS           = 5.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'Invoice print failed' TYPE 'E'.
+    ENDIF.
+
+  ELSE.
+
+
+IF p_invno IS INITIAL.
+
+  SELECT *
+    FROM zvendor_inv
+    INTO TABLE gt_invoice.
+
+ELSE.
+
+  SELECT *
+    FROM zvendor_inv
+    INTO TABLE gt_invoice
+    WHERE inv_no = p_invno.
+
+ENDIF.
+
+
+    IF gt_invoice IS INITIAL.
+      MESSAGE 'No invoices found' TYPE 'I'.
+      RETURN.
+    ENDIF.
+
+    CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+      EXPORTING
+        i_callback_program = sy-repid
+        i_structure_name   = 'ZVENDOR_INV'
+        is_layout          = gs_layout
+      TABLES
+        t_outtab           = gt_invoice
+      EXCEPTIONS
+        program_error      = 1
+        OTHERS             = 2.
+
+    IF sy-subrc <> 0.
+      MESSAGE 'ALV display failed' TYPE 'I'.
+    ENDIF.
+
+  ENDIF.
