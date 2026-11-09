@@ -1,0 +1,3 @@
+REPORT ZHAR_SEARCHHELP.
+PARAMETERS: p_cell TYPE likp-vbeln
+            MATCHCODE OBJECT zch_delivery.
