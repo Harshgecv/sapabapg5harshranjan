@@ -1,0 +1,38 @@
+
+REPORT zdelivery_items_report.
+
+PARAMETERS p_vbeln TYPE lips-vbeln.
+
+DATA: gt_items TYPE ztt_lips,
+      gs_item  TYPE zlips_str.
+
+START-OF-SELECTION.
+
+  CALL FUNCTION 'ZFM_GET_DELIVERY_ITEMS'
+    EXPORTING
+      iv_vbeln = p_vbeln
+    TABLES
+      et_items = gt_items.
+
+  IF gt_items IS INITIAL.
+    WRITE: / 'No delivery items found for:', p_vbeln.
+    RETURN.
+  ENDIF.
+
+  WRITE: / 'DELIVERY ITEM DETAILS'.
+  ULINE.
+
+  WRITE: / 'Delivery',
+          15 'Item',
+          30 'Material',
+          55 'Quantity'.
+  ULINE.
+
+  LOOP AT gt_items INTO gs_item.
+
+    WRITE: / gs_item-vbeln,
+            15 gs_item-posnr,
+            30 gs_item-matnr,
+            55 gs_item-lfimg.
+
+  ENDLOOP.
