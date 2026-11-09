@@ -1,0 +1,221 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMKPF_MSEG_INTERACTIVE
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT ZMKPF_MSEG_INTERACTIVE.
+
+
+
+TYPE-POOLS: slis.
+
+DATA: gt_mkpf TYPE STANDARD TABLE OF mkpf,
+      gt_mseg TYPE STANDARD TABLE OF mseg,
+      gt_head TYPE slis_t_fieldcat_alv,
+      gt_item TYPE slis_t_fieldcat_alv,
+      gs_fcat TYPE slis_fieldcat_alv.
+
+START-OF-SELECTION.
+
+
+  SELECT mblnr mjahr budat bldat usnam
+    FROM mkpf
+    INTO CORRESPONDING FIELDS OF TABLE gt_mkpf
+    UP TO 100 ROWS.
+
+
+  IF gt_mkpf IS INITIAL.
+    MESSAGE 'No material documents found' TYPE 'I'.
+    RETURN.
+  ENDIF.
+
+  PERFORM build_header_catalog.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'SET_PF_STATUS'
+      i_callback_user_command  = 'USER_COMMAND'
+      it_fieldcat              = gt_head
+      i_grid_title             = 'Material Document Header - MKPF'
+    TABLES
+      t_outtab                 = gt_mkpf
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+
+FORM build_header_catalog.
+
+  CLEAR gt_head.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MBLNR'.
+  gs_fcat-seltext_m = 'Document Number'.
+  APPEND gs_fcat TO gt_head.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MJAHR'.
+  gs_fcat-seltext_m = 'Year'.
+  APPEND gs_fcat TO gt_head.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'BUDAT'.
+  gs_fcat-seltext_m = 'Posting Date'.
+  APPEND gs_fcat TO gt_head.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'BLDAT'.
+  gs_fcat-seltext_m = 'Document Date'.
+  APPEND gs_fcat TO gt_head.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'USNAM'.
+  gs_fcat-seltext_m = 'Created By'.
+  APPEND gs_fcat TO gt_head.
+
+ENDFORM.
+
+FORM set_pf_status USING rt_extab TYPE slis_t_extab.
+
+  SET PF-STATUS 'ZALV_STATUS'.
+
+ENDFORM.
+
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                        rs_selfield TYPE slis_selfield.
+
+  DATA: ls_mkpf TYPE mkpf,
+        lv_file TYPE string,
+        lv_path TYPE string,
+        lv_name TYPE string,
+        lv_action TYPE i.
+
+  CASE r_ucomm.
+
+    WHEN '&IC1'.
+
+      READ TABLE gt_mkpf INTO ls_mkpf
+        INDEX rs_selfield-tabindex.
+
+      IF sy-subrc = 0.
+
+        CLEAR gt_mseg.
+
+
+SELECT mblnr mjahr zeile matnr
+       werks lgort bwart menge meins
+  FROM mseg
+  INTO CORRESPONDING FIELDS OF TABLE gt_mseg
+  WHERE mblnr = ls_mkpf-mblnr
+    AND mjahr = ls_mkpf-mjahr.
+
+
+        IF gt_mseg IS INITIAL.
+          MESSAGE 'No items found for this document' TYPE 'I'.
+          RETURN.
+        ENDIF.
+
+        PERFORM build_item_catalog.
+
+        CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+          EXPORTING
+            i_callback_program = sy-repid
+            it_fieldcat        = gt_item
+            i_grid_title       = 'Material Document Items - MSEG'
+          TABLES
+            t_outtab           = gt_mseg.
+
+      ENDIF.
+
+    WHEN 'EXCEL'.
+
+      CALL METHOD cl_gui_frontend_services=>file_save_dialog
+        EXPORTING
+          default_extension = 'xls'
+          default_file_name = 'MKPF_Export.xls'
+        CHANGING
+          filename          = lv_name
+          path              = lv_path
+          fullpath          = lv_file
+          user_action       = lv_action
+        EXCEPTIONS
+          OTHERS            = 1.
+
+      IF sy-subrc = 0 AND lv_action = 0
+         AND lv_file IS NOT INITIAL.
+
+        CALL FUNCTION 'GUI_DOWNLOAD'
+          EXPORTING
+            filename              = lv_file
+            filetype              = 'ASC'
+            write_field_separator = 'X'
+          TABLES
+            data_tab              = gt_mkpf
+          EXCEPTIONS
+            OTHERS                = 1.
+
+        IF sy-subrc = 0.
+          MESSAGE 'Export completed' TYPE 'S'.
+        ELSE.
+          MESSAGE 'Export failed' TYPE 'E'.
+        ENDIF.
+
+      ENDIF.
+
+  ENDCASE.
+
+ENDFORM.
+
+FORM build_item_catalog.
+
+  CLEAR gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MBLNR'.
+  gs_fcat-seltext_m = 'Document'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MJAHR'.
+  gs_fcat-seltext_m = 'Year'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'ZEILE'.
+  gs_fcat-seltext_m = 'Item'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MATNR'.
+  gs_fcat-seltext_m = 'Material'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'WERKS'.
+  gs_fcat-seltext_m = 'Plant'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'LGORT'.
+  gs_fcat-seltext_m = 'Storage Location'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'BWART'.
+  gs_fcat-seltext_m = 'Movement Type'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MENGE'.
+  gs_fcat-seltext_m = 'Quantity'.
+  APPEND gs_fcat TO gt_item.
+
+  CLEAR gs_fcat.
+  gs_fcat-fieldname = 'MEINS'.
+  gs_fcat-seltext_m = 'Unit'.
+  APPEND gs_fcat TO gt_item.
+
+ENDFORM.
