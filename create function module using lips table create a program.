@@ -1,0 +1,17 @@
+UNCTION ZFM_GET_DELIVERY_ITEMS.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_VBELN) TYPE  VBELN_VL
+*"  TABLES
+*"      ET_ITEMS TYPE  ZTT_LIPS
+*"----------------------------------------------------------------------
+
+SELECT *
+  FROM lips
+  INTO CORRESPONDING FIELDS OF TABLE et_items
+  WHERE vbeln = iv_vbeln.
+
+
+
+ENDFUNCTION.
